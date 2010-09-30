@@ -1,0 +1,229 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<title>Canvas Raytracer @ Flog</title>
+<script type="text/javascript" src="static/js/prototype.js"></script>
+<script type="text/javascript" src="static/js/flog/color.js"></script>
+<script type="text/javascript" src="static/js/flog/light.js"></script>
+<script type="text/javascript" src="static/js/flog/vector.js"></script>
+<script type="text/javascript" src="static/js/flog/ray.js"></script>
+<script type="text/javascript" src="static/js/flog/scene.js"></script>
+<script type="text/javascript" src="static/js/flog/material/basematerial.js"></script>
+<script type="text/javascript" src="static/js/flog/material/solid.js"></script>
+<script type="text/javascript" src="static/js/flog/material/chessboard.js"></script>
+<script type="text/javascript" src="static/js/flog/shape/baseshape.js"></script>
+<script type="text/javascript" src="static/js/flog/shape/sphere.js"></script>
+<script type="text/javascript" src="static/js/flog/shape/plane.js"></script>
+<script type="text/javascript" src="static/js/flog/intersectioninfo.js"></script>
+<script type="text/javascript" src="static/js/flog/camera.js"></script>
+<script type="text/javascript" src="static/js/flog/background.js"></script>
+<script type="text/javascript" src="static/js/flog/engine.js"></script>
+
+<script type="text/javascript">
+var step = 0;
+var frame = 0;
+var interval = null;
+
+function renderScene(){ 
+    window.clearTimeout(interval);
+    
+    var scene = new Flog.RayTracer.Scene();
+    
+    scene.camera = new Flog.RayTracer.Camera(
+                        new Flog.RayTracer.Vector(0, 0, -15),
+                        new Flog.RayTracer.Vector(-0.2, 0, 5),
+                        new Flog.RayTracer.Vector(0, 1, 0)
+                    );
+    
+    scene.background = new Flog.RayTracer.Background(
+                                new Flog.RayTracer.Color(0.5, 0.5, 0.5),
+                                0.4
+                            );
+    
+    var radius = 2 * Math.sin((frame / 100) % (Math.PI * 2)) + 1;
+    var sphere = new Flog.RayTracer.Shape.Sphere(
+        new Flog.RayTracer.Vector(-1.5, 1.5, 2),
+        radius,
+        new Flog.RayTracer.Material.Solid(
+            new Flog.RayTracer.Color(0,0.5,0.5),
+            0.5,
+            0.0,
+            0.0,
+            1.0
+        )
+    );
+    
+    var sphere1 = new Flog.RayTracer.Shape.Sphere(
+        new Flog.RayTracer.Vector(1, 0.25, 1),
+        0.5,
+        new Flog.RayTracer.Material.Solid(
+            new Flog.RayTracer.Color(0.9,0.9,0.9),
+            0.1,
+            0.0,
+            0.0,
+            1.5
+        )
+    );
+    
+    var plane = new Flog.RayTracer.Shape.Plane(
+                                new Flog.RayTracer.Vector(0.1, 0.9, -0.5).normalize(),
+                                1.2,
+                                new Flog.RayTracer.Material.Chessboard(
+                                    new Flog.RayTracer.Color(1,1,1),
+                                    new Flog.RayTracer.Color(0,0,0),
+                                    0.2,
+                                    0.0,
+                                    1.0,
+                                    0.7
+                                )
+                            );
+    
+    scene.shapes.push(plane);
+    scene.shapes.push(sphere);
+    scene.shapes.push(sphere1);
+
+    var light = new Flog.RayTracer.Light(
+        new Flog.RayTracer.Vector(5, 10, -1),
+        new Flog.RayTracer.Color(0.8, 0.8, 0.8)
+    );
+    
+    var light1 = new Flog.RayTracer.Light(
+        new Flog.RayTracer.Vector(-3, 5, -15),
+        new Flog.RayTracer.Color(0.8, 0.8, 0.8),
+        100
+    );
+    
+    scene.lights.push(light);
+    scene.lights.push(light1);
+    
+    /* Load rendering options */
+    var imageWidth = $F('imageWidth');
+    var imageHeight = $F('imageHeight');
+    var pixelSize = $F('pixelSize').split(',');
+    var renderDiffuse = $F('renderDiffuse');
+    var renderShadows = $F('renderShadows');
+    var renderHighlights = $F('renderHighlights');
+    var renderReflections = $F('renderReflections');
+    var rayDepth = 2;//$F('rayDepth');
+    
+    var raytracer = new Flog.RayTracer.Engine(
+        {
+            canvasWidth: imageWidth,
+            canvasHeight: imageHeight,
+            pixelWidth: pixelSize[0],
+            pixelHeight: pixelSize[1],
+            "renderDiffuse": renderDiffuse,
+            "renderHighlights": renderHighlights,
+            "renderShadows": renderShadows,
+            "renderReflections": renderReflections,
+            "rayDepth": rayDepth
+        }
+    );
+    
+    function renderSceneTile(scene, canvas, tx, ty, tn){
+      /* Get canvas */    
+      this.canvas = canvas.getContext("2d");
+      
+      var canvasHeight = this.options.canvasHeight;
+      var tileHeight = canvasHeight / tn;
+      var canvasWidth = this.options.canvasWidth;
+      var tileWidth = canvasWidth / tn;
+
+      for(var y = ty * tileHeight; y < (ty + 1) * tileHeight; y++){
+        for(var x = tx * tileWidth; x < (tx + 1) * tileWidth; x++){
+          var yp = y * 1.0 / canvasHeight * 2 - 1;
+          var xp = x * 1.0 / canvasWidth * 2 - 1;
+          var ray = scene.camera.getRay(xp, yp);
+          this.setPixel(x, y, this.getPixelColor(ray, scene));
+        }
+      }
+    };
+    
+    //$("canvas").setAttribute("width", imageWidth);
+    //$("canvas").setAttribute("height", imageHeight);
+    
+    var tiles = 4;
+    var tileX = step % tiles;
+    var tileY = Math.floor(step / tiles) % tiles;
+    console.log('tileX', tileX, 'tileY', tileY);
+    renderSceneTile.call(raytracer, scene, $("canvas"), tileX, tileY, tiles);
+    
+    step = (step + 1) % 1000000;
+    if (tileX == tiles - 1 && tileY == tiles - 1) {
+      frame += 1;
+    }
+    interval = window.setTimeout(renderScene, 200);
+}
+
+function start(){
+    Event.observe('btnRender', 'click', renderScene);
+}
+
+window.addEventListener("load", start, false);
+
+</script>
+
+<style type="text/css">
+body {
+    background: #fff;
+    font: 11px/1.6em Tahoma, Verdana, Arial, sans-serif;
+}
+canvas {
+    border: 5px solid #000;
+    background: #000;
+    float: left;
+}
+fieldset#options {
+    width: 180px;
+    margin-left: 20px;
+    float: left;
+}
+</style>
+    
+</head>
+<body>
+
+<h1>Flog.RayTracer Canvas Demo</h1>
+<p>Warning: This is very CPU intensive. Your browser may appear to stop responding. I suggest using Opera, as it has
+a great (fast) JavaScript processor.</p>
+
+<canvas id="canvas" width="500" height="500" style="border:5px solid #000"></canvas>
+
+<fieldset id="options">
+    <legend>Rendering Options</legend>
+    <fieldset>
+        <legend>Output</legend>
+        <label for="imageWidth">Image Width: </label><br />
+        <input type="text" id="imageWidth" value="500" />
+        <br />
+        <label for="imageHeight">Image Height: </label><br />
+        <input type="text" id="imageHeight" value="500" />
+        <br />
+        <label for="pixelSize">Pixel size:</label><br />
+        <select id="pixelSize">
+            <option value="20,20">Quick &amp; nasty (20x20)</option>
+            <option value="10,10">Faster (10x10)</option>
+            <option value="5,5">Fast (5x5)</option>
+            <option value="2,5">Ok quality (2x5)</option>
+            <option value="2,2">Good quality (2x2)</option>
+            <option value="1,1">Best quality (1x1)</option>
+        </select>
+    </fieldset>
+    
+    <fieldset>
+        <legend>Render</legend>
+        <label><input type="checkbox" id="renderDiffuse" checked="checked" /> Diffuse</label>
+        <br />
+        <label><input type="checkbox" id="renderShadows" checked="checked" /> Shadows</label>
+        <br />
+        <label><input type="checkbox" id="renderHighlights" checked="checked" /> Highlights</label>
+        <br />
+        <label><input type="checkbox" id="renderReflections" checked="checked" /> Reflections</label>
+    </fieldset>
+    
+    <button type="button" id="btnRender">Render</button>
+</fieldset>
+
+</body>
+</html>

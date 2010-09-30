@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Distributed Raytracer</title>
+    <script type="text/javascript" src="static/js/prototype.js"></script>
+    <script type="text/javascript" src="static/js/flog/color.js"></script>
+    <script type="text/javascript" src="static/js/flog/light.js"></script>
+    <script type="text/javascript" src="static/js/flog/vector.js"></script>
+    <script type="text/javascript" src="static/js/flog/ray.js"></script>
+    <script type="text/javascript" src="static/js/flog/scene.js"></script>
+    <script type="text/javascript" src="static/js/flog/material/basematerial.js"></script>
+    <script type="text/javascript" src="static/js/flog/material/solid.js"></script>
+    <script type="text/javascript" src="static/js/flog/material/chessboard.js"></script>
+    <script type="text/javascript" src="static/js/flog/shape/baseshape.js"></script>
+    <script type="text/javascript" src="static/js/flog/shape/sphere.js"></script>
+    <script type="text/javascript" src="static/js/flog/shape/plane.js"></script>
+    <script type="text/javascript" src="static/js/flog/intersectioninfo.js"></script>
+    <script type="text/javascript" src="static/js/flog/camera.js"></script>
+    <script type="text/javascript" src="static/js/flog/background.js"></script>
+    <script type="text/javascript" src="static/js/flog/engine.js"></script>
+    <script>
+      var go = true;
+      var step = 0;
+      //var interval = null;
+
+      function renderScene(tileX, tileY, tileNum, frameNum){ 
+        //window.clearTimeout(interval);
+
+        var scene = new Flog.RayTracer.Scene();
+
+        scene.camera = new Flog.RayTracer.Camera(
+          new Flog.RayTracer.Vector(0, 0, -15),
+          new Flog.RayTracer.Vector(-0.2, 0, 5),
+          new Flog.RayTracer.Vector(0, 1, 0)
+        );
+
+        scene.background = new Flog.RayTracer.Background(
+          new Flog.RayTracer.Color(0.5, 0.5, 0.5),
+          0.4
+        );
+
+        var radius = 2 * Math.sin((frameNum * 1.0 / 10.0) % (Math.PI * 2)) + 1;
+        var sphere = new Flog.RayTracer.Shape.Sphere(
+          new Flog.RayTracer.Vector(-1.5, 1.5, 2),
+          radius,
+          new Flog.RayTracer.Material.Solid(
+            new Flog.RayTracer.Color(0,0.5,0.5),
+            0.5,
+            0.0,
+            0.0,
+            1.0
+          )
+        );
+
+        var sphere1 = new Flog.RayTracer.Shape.Sphere(
+          new Flog.RayTracer.Vector(1, 0.25, 1),
+          0.5,
+          new Flog.RayTracer.Material.Solid(
+            new Flog.RayTracer.Color(0.9,0.9,0.9),
+            0.1,
+            0.0,
+            0.0,
+            1.5
+          )
+        );
+
+        var plane = new Flog.RayTracer.Shape.Plane(
+          new Flog.RayTracer.Vector(0.1, 0.9, -0.5).normalize(),
+          1.2,
+          new Flog.RayTracer.Material.Chessboard(
+            new Flog.RayTracer.Color(1,1,1),
+            new Flog.RayTracer.Color(0,0,0),
+            0.2,
+            0.0,
+            1.0,
+            0.7
+          )
+        );
+
+        scene.shapes.push(plane);
+        scene.shapes.push(sphere);
+        scene.shapes.push(sphere1);
+
+        var light = new Flog.RayTracer.Light(
+          new Flog.RayTracer.Vector(5, 10, -1),
+          new Flog.RayTracer.Color(0.8, 0.8, 0.8)
+        );
+
+        var light1 = new Flog.RayTracer.Light(
+          new Flog.RayTracer.Vector(-3, 5, -15),
+          new Flog.RayTracer.Color(0.8, 0.8, 0.8),
+          100
+        );
+
+        scene.lights.push(light);
+        scene.lights.push(light1);
+
+        /* Load rendering options */
+        var imageWidth = 300; // $F('imageWidth');
+        var imageHeight = 300; //$F('imageHeight');
+        var pixelSize = [1, 1]; //$F('pixelSize').split(',');
+        var renderDiffuse = "on"; //$F('renderDiffuse');
+        var renderShadows = "on"; //$F('renderShadows');
+        var renderHighlights = "on"; //$F('renderHighlights');
+        var renderReflections = "on"; //$F('renderReflections');
+        var rayDepth = 2; //$F('rayDepth');
+
+        var raytracer = new Flog.RayTracer.Engine(
+          {
+            canvasWidth: imageWidth,
+            canvasHeight: imageHeight,
+            pixelWidth: pixelSize[0],
+            pixelHeight: pixelSize[1],
+            "renderDiffuse": renderDiffuse,
+            "renderHighlights": renderHighlights,
+            "renderShadows": renderShadows,
+            "renderReflections": renderReflections,
+            "rayDepth": rayDepth
+          }
+        );
+
+        function renderSceneTile(scene, canvas, tx, ty, tn){
+          /* Get canvas */    
+          this.canvas = canvas.getContext("2d");
+
+          var canvasHeight = this.options.canvasHeight;
+          var tileHeight = canvasHeight / tn;
+          var canvasWidth = this.options.canvasWidth;
+          var tileWidth = canvasWidth / tn;
+
+          $("canvasTile").setAttribute("width", tileWidth);
+          $("canvasTile").setAttribute("height", tileHeight);
+
+          for(var y = 0; y < tileHeight; y++){
+            for(var x = 0; x < tileWidth; x++){
+              var yp = (ty * tileHeight + y) * 1.0 / canvasHeight * 2 - 1;
+              var xp = (tx * tileWidth + x) * 1.0 / canvasWidth * 2 - 1;
+              var ray = scene.camera.getRay(xp, yp);
+              this.setPixel(x, y, this.getPixelColor(ray, scene));
+            }
+          }
+        };
+
+        $('debugTile').innerHTML = 'x: ' + tileX + ', y: ' + tileY +
+            ', frame: ' + frameNum;
+        
+        renderSceneTile.call(raytracer, scene, $("canvasTile"), tileX, tileY, tileNum);
+
+        return $("canvasTile").toDataURL();
+      };
+
+      function start(){
+        Event.observe('btnStop', 'click', function () { go = false; });
+        $('canvasFrame').width = 300;
+        $('canvasFrame').height = 300;
+        
+        var ws = new WSController();
+      };
+
+      function WSController() {
+        this.socket = new WebSocket("ws://{{ host }}/websocket");
+        this.socket.addEventListener('message', this.onMessage_.bind(this));
+        this.socket.addEventListener('open', this.requestTile.bind(this));
+      };
+
+      WSController.prototype.requestTile = function() {
+        this.send_('NEEDTILE');
+      };
+
+      WSController.prototype.send_ = function(action, data) {
+        this.socket.send(JSON.stringify({
+          'action': action,
+          'data': data
+        }));
+      };
+      
+      WSController.prototype.onMessage_ = function(evt) {
+        payload = JSON.parse(evt.data);
+        switch (payload['action']) {
+          case 'TILE':
+            var x = payload['data']['x'];
+            var y = payload['data']['y'];
+            var frameNum = payload['data']['frame'];
+            var numTiles = payload['data']['tiles'];
+            var connections = payload['data']['connections'];
+            var fps = payload['data']['fps'];
+            
+            $('debugConnection').innerHTML = 'connections: ' + connections +
+                ', fps: ' + fps;
+            
+            var tile = renderScene(x, y, numTiles, frameNum)
+            this.send_('TILE', {'frame': frameNum, 'x': x, 'y': y, 'data': tile});
+            if (go) {
+              this.requestTile();
+            }
+            break;
+          case 'FRAME':
+            var canvas = $('canvasFrame');
+            var context = canvas.getContext('2d');
+            var numTiles = payload['data']['tiles'];
+            tileWidth = canvas.width / numTiles;
+            tileHeight = canvas.height / numTiles;
+            for (var x = 0; x < numTiles; x++) {
+              for (var y = 0; y < numTiles; y++) {
+                var image = new Image();
+                image.addEventListener("load", 
+                    drawTile(image, context, x, y, tileWidth, tileHeight), 
+                    false);
+                image.src = payload['data']['imagedata'][x][y];
+              }
+            }
+            break;
+          default: 
+            console.log(evt);
+            break;
+        }
+      };
+      
+      function drawTile(image, context, x, y, tileWidth, tileHeight) {
+        return function() {
+          context.drawImage(image, x * tileWidth, y * tileHeight);
+        };
+      };
+      
+      window.addEventListener("load", start, false);
+    </script>
+  </head>
+  <body>
+    <canvas id="canvasTile"></canvas>
+    <canvas id="canvasFrame"></canvas>
+    <div id="debugTile"></div>
+    <div id="debugConnection"></div>
+    <button id="btnStop">Stop</button>
+  </body>
+</html>
