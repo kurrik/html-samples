@@ -150,7 +150,7 @@ application = tornado.web.Application([
 })
 
 if __name__ == "__main__":
-    port = 7785
+    port = 80 
     http_server = tornado.httpserver.HTTPServer(application)
     http_server.listen(port)
     print "Started server on port %s" % port
