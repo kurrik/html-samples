@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      html {
+        height: 100%;
+      }
+      body{ 
+        background: #fff;
+        height: 100%;
+      }
+      #box {
+        -webkit-box-orient: vertical;
+        -webkit-box-align: center;
+        -webkit-box-pack: center;
+        display: -webkit-box;
+        height: 100%;  
+      }
+      #wrap {
+        -webkit-box-flex: 0;
+        text-align: center;
+        margin: 0 auto;
+        
+        font: 200px Arial;
+        text-transform: uppercase;
+        color: #000;
+        text-shadow: 0px 5px 0px #fff;
+      }
+      #layerwrap {
+        width: 300px;
+        height: 300px;
+        position: relative;
+      }
+      .layer {
+        position: absolute;
+        left: 0;
+        top: 0;
+        -webkit-transition-property: x, y;
+        -webkit-transition-duration: 0.1s;
+        -webkit-transition-timing-function: linear;
+      }
+      .layer:nth-child(1) {
+        z-index: 1;
+      }
+      .layer:nth-child(2) {
+        z-index: 2;
+      }
+      .layer:nth-child(3) {
+        z-index: 3;
+      }
+      .layer:nth-child(4) {
+        z-index: 4;
+      }
+      .layer:nth-child(5) {
+        z-index: 5;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="box">
+      <div id="wrap">
+        <div id="layerwrap">
+          <div class="layer"><img src="layer-01.png"/></div>
+          <div class="layer"><img src="layer-02.png"/></div>
+          <div class="layer"><img src="layer-03.png"/></div>
+          <div class="layer"><img src="layer-04.png"/></div>
+          <div class="layer"><img src="layer-05.png"/></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      var lastGamma = 0;
+      var lastBeta = 0;
+      function onTilt(evt) {
+        var elems = document.querySelectorAll('.layer');
+        var overThreshold = Math.abs(evt.gamma) > 6 || Math.abs(evt.beta) > 6;
+        var gamma = overThreshold ? evt.gamma : 0; 
+        var beta = overThreshold ? evt.beta : 0;
+        if (lastGamma != gamma || lastBeta != beta) {
+          Array.prototype.forEach.call(elems, function(elem) {
+            var style = document.defaultView.getComputedStyle(elem);
+            var zindex = parseInt(style.getPropertyValue("z-index"));
+            var x = Math.round(3.0 * gamma * zindex);
+            var y = Math.round(3.0 * beta * zindex);
+            elem.style.setProperty('left', x.toString() + 'px');
+            elem.style.setProperty('top', y.toString() + 'px');
+            elem.style.setProperty('-webkit-transform', 'rotateY(' + -2.0 * gamma + 'deg) rotateX(' + -2.0 * beta + 'deg)');
+          });
+        }
+        lastGamma = gamma;
+        lastBeta = beta;
+      };
+      
+      window.addEventListener("deviceorientation", onTilt, true);    
+    </script>
+  </body>
+</html>
