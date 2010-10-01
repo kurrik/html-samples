@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<!--
+  # Copyright 2010 Google, Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+-->
+<html>
+  <head>
+    <style>
+      body {
+        font: 16px Arial;
+      }
+      .dropTarget {
+        width: 300px; 
+        height: 300px;
+        text-align: center;
+        -webkit-border-radius: 10px;
+        -webkit-box-shadow: 0 5px 5px #999;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-box-pack: center;
+        -webkit-box-flex: 0;
+        border: 2px solid #fff;
+      }
+      .dragOver {
+        border: 2px solid #d00;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dropTarget">Drop files here</div>
+    <output id="list"></output>
+    <canvas id="outputCanvas"></canvas>
+
+    <script>
+      function handleFileSelect(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+        remClass(evt.target, "dragOver");
+        
+        var files = evt.dataTransfer.files; // FileList object.
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          console.log(file);
+          
+          if (!file.type.match('image.*')) {
+            console.log('skipping non image');
+            continue;
+          }
+          
+          var reader = new FileReader();
+          reader.onload = function(evt) {
+            console.log('reader.onload', evt);
+            /*
+            var img = new Image();
+            img.onload = function(evt) {
+              console.log('img.onload', evt);
+              var canvas = document.getElementById("outputCanvas");
+              var context = canvas.getContext('2d');
+              context.drawImage(this, 0, 0);
+            };
+            img.src = evt.target.result;
+            */
+          };
+          reader.onerror = function(evt) {
+            console.log('reader.onerror', evt);
+          };
+          reader.readAsDataURL(file);
+          console.log('done reading ', file);
+        }
+      };
+
+      function addClass(elem, name) {
+        if (!new RegExp("\\b" + name + "\\b", "g").test(elem.className)) {
+          elem.className = elem.className + ' ' + name;
+        }
+      };
+      
+      function remClass(elem, name) {
+        var regExp = new RegExp("\\b" + name + "\\b", "g");
+        elem.className = elem.className.replace(regExp, "");
+      };
+      
+      function handleDragOver(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+      };
+      
+      function handleDragEnter(evt) {
+        addClass(evt.target, "dragOver");
+        evt.target.setAttribute('data-drag-listener', true);
+        evt.target.addEventListener('dragleave', handleDragLeave, false);
+      };
+      
+      function handleDragLeave(evt) {
+        remClass(evt.target, 'dragOver');
+        evt.target.removeEventListener('dragLeave', handleDragLeave, false);
+      };
+
+      // Setup the dnd listeners.
+      var dropZone = document.querySelector('.dropTarget');
+      dropZone.addEventListener('dragover', handleDragOver, false);
+      dropZone.addEventListener('dragenter', handleDragEnter, false);
+      dropZone.addEventListener('drop', handleFileSelect, false);
+    </script>
+  </body>
+</html>
