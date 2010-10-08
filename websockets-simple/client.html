@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<!--
+  # Copyright 2010 Google, Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+-->
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Simple Websockets Demo</title>
+    <style>
+      body {
+        font: 24px Arial;
+      }
+      #output {
+        display: block;
+        cursor: crosshair;
+      }
+      #outputwrap {
+        -webkit-box-shadow: 0 5px 5px #333;
+        padding: 5px;
+        background: #fff;
+        border: 1px solid #999;
+        margin-bottom: 10px;
+        float: left;
+      }
+      #controls {
+        clear: both;
+      }
+      #color {
+        display: inline;
+        vertical-align: sub;
+      }
+    </style>
+    <script>
+      function WSController() {
+        var myself = this;
+        this.socket = new WebSocket("ws://{{ host }}/websocket");
+        var onMessage = function(evt) { myself.onMessage_(evt); };
+        this.socket.addEventListener('message', onMessage);
+      };
+
+      WSController.prototype.send_ = function(action, data) {
+        var payload = JSON.stringify({
+          'action': action,
+          'data': data
+        });
+        this.socket.send(payload);
+      };
+      
+      WSController.prototype.sendClick = function(x, y, color) {
+        this.send_('MOVE', {
+          'x': Math.floor(x / PIXEL_SIZE),
+          'y': Math.floor(y / PIXEL_SIZE),
+          'c': color 
+        });
+      };
+      
+      WSController.prototype.onMessage_ = function(evt) {
+        payload = JSON.parse(evt.data);
+        switch (payload['action']) {
+          case 'BOARD':
+            var size = payload['data']['size'];
+            var canvas = document.querySelector('#output');
+            canvas.width = PIXEL_SIZE * size;
+            canvas.height = PIXEL_SIZE * size;
+            
+            var context = canvas.getContext('2d');
+            for (var i = 0; i < payload['data']['board'].length; i++) {
+              var x = i % size;
+              var y = Math.floor(i / size);
+              var c = payload['data']['board'][i];
+              if (!c) {
+                c = '#ffffff';
+              }
+              paint(context, x, y, c);
+            }
+            break;
+          case 'MOVE':
+            var canvas = document.querySelector('#output');
+            var context = canvas.getContext('2d');
+            var x = payload['data']['x'];
+            var y = payload['data']['y'];
+            var c = payload['data']['c'];
+            paint(context, x, y, c);
+            break;
+          default: 
+            console.log(evt);
+            break;
+        }
+      };
+      
+      var PIXEL_SIZE = 30;
+      var COLOR = '#' + Math.floor(Math.random() * 0xffffff).toString(16);
+      
+      function paint(context, x, y, c) {
+        context.fillStyle = c;
+        context.fillRect(
+            x * PIXEL_SIZE, 
+            y * PIXEL_SIZE, 
+            PIXEL_SIZE, 
+            PIXEL_SIZE);
+        context.fill();
+      };
+      
+      function start() {
+        var color = document.querySelector('#color');
+        color.width = PIXEL_SIZE;
+        color.height = PIXEL_SIZE;
+        paint(color.getContext('2d'), 0, 0, COLOR);
+        
+        var ws = new WSController();
+        var canvas = document.querySelector('#output');
+        canvas.addEventListener('click', function (evt) {
+          ws.sendClick(evt.offsetX, evt.offsetY, COLOR);
+        }, false);
+        canvas.addEventListener('selectstart', function(evt) {
+          evt.preventDefault();
+          return false;
+        }, false);
+      };
+      
+      window.addEventListener("load", start, false);
+    </script>
+  </head>
+  <body>
+    <div id="outputwrap"><canvas id="output"></canvas></div>
+    <div id="controls">
+      Your color: <canvas id="color"></canvas>
+    </div>
+  </body>
+</html>
