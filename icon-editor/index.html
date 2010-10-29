@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<!--
+  # Copyright 2010 Google, Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+-->
+<html>
+  <head>
+    <style>
+      body {
+        font: 16px Arial;
+        display: -webkit-box;
+        -webkit-box-orient: horizontal;
+      }
+      .dropTarget {
+        width: 150px; 
+        height: 150px;
+        text-align: center;
+        -webkit-border-radius: 20px;
+        -webkit-box-shadow: 0 5px 5px #ccc;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-box-pack: center;
+        -webkit-box-flex: 0;
+        border: 2px solid #ccc;
+      }
+      .dragOver {
+        border: 2px solid #d00;
+      }
+      
+      canvas {
+        border: 1px solid #ccc;
+        margin: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dropTarget">Drop files here</div>
+    <canvas id="outputCanvas"></canvas>
+    <canvas id="alphaCanvas"></canvas>
+    <canvas id="resizedCanvas"></canvas>
+    <canvas id="resizedAlpha"></canvas>
+    <script>
+      function resizeImage(canvas, scale) {
+        var dst = document.getElementById('resizedCanvas');
+        
+        var sx = 0;
+        var sy = 0;
+        var sw = canvas.width;
+        var sh = canvas.height;
+        var dw = sw * scale;
+        var dh = sh * scale;
+        var dx = (sw - dw) / 2;
+        var dy = (sh - dh) / 2;
+        
+        console.log(sw, sh, dw, dh, dx, dy);
+        
+        dst.width = sw;
+        dst.height = sh;
+        
+        var context = dst.getContext('2d');
+        context.drawImage(canvas, sx, sy, sw, sh, dx, dy, dw, dh);
+        
+        var dst_alpha = document.getElementById('resizedAlpha');
+        processAlpha(dst, dst_alpha);
+      };
+      
+      function processAlpha(src, dst) {
+        dst.width = src.width;
+        dst.height = src.height;
+        
+        var data_src = src.getContext('2d').getImageData(0, 0, 
+            src.width, src.height);
+        var data_dst = dst.getContext('2d').createImageData(
+            dst.width, dst.height);
+            
+        var len = data_src.data.length;
+        var transparent = 0;
+        var opaque = 0;
+        for (var i = 0; i < len; i += 4) {
+          var a = data_src.data[i + 3];
+          if (a > 100) {
+            opaque++;
+            data_dst.data[i] = 0;
+            data_dst.data[i + 1] = 0;
+            data_dst.data[i + 2] = 0;
+            data_dst.data[i + 3] = 255;
+          } else {
+            transparent++;
+          }
+        }
+        
+        var imageratio = opaque / (opaque + transparent);
+        var idealratio = (96 * 96) / (128 * 128);
+        var scale = Math.sqrt(idealratio / imageratio);
+        
+        console.log('Ratio:', imageratio);
+        console.log('Looking for:', idealratio);
+        
+        dst.getContext('2d').putImageData(data_dst, 0, 0);
+        
+        return scale;
+      };
+      
+      function renderImageAt128(canvas, image) {
+        var ICON_SIZE = 128;
+        canvas.width = ICON_SIZE;
+        canvas.height = ICON_SIZE;
+        
+        var sx = 0;
+        var sy = 0;
+        var sw = image.width;
+        var sh = image.height;
+        var dx = 0;
+        var dy = 0;
+        var dw = ICON_SIZE;
+        var dh = ICON_SIZE;
+        
+        if (sw != sh) {
+          if (sw > sh) {
+            dh = (sh / sw) * dh;
+          } else {
+            dw = (sw / sh) * dw;
+          }
+          dx = (ICON_SIZE - dw) / 2;
+          dy = (ICON_SIZE - dh) / 2;
+        }
+        
+        var context = canvas.getContext('2d');
+        context.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
+        
+        var src = document.getElementById('outputCanvas');
+        var dst = document.getElementById('alphaCanvas');
+        var scale = processAlpha(src, dst);
+        resizeImage(src, scale);
+      };
+      
+      function handleFileSelect(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+        remClass(evt.target, "dragOver");
+        
+        var files = evt.dataTransfer.files;
+        for (var i = 0; i < files.length; i++) {
+          var file = files[i];
+          if (!file.type.match('image.*')) {
+            console.log('skipping non image');
+            continue;
+          }
+          
+          var reader = new FileReader();
+          reader.onload = function(evt) {
+            var img = new Image();
+            img.onload = function(evt) {
+              var canvas = document.getElementById("outputCanvas");
+              renderImageAt128(canvas, this);
+            };
+            img.src = evt.target.result;
+          };
+          console.log('File', file);
+          reader.readAsDataURL(file);
+        }
+      };
+
+      function addClass(elem, name) {
+        if (!new RegExp("\\b" + name + "\\b", "g").test(elem.className)) {
+          elem.className = elem.className + ' ' + name;
+        }
+      };
+      
+      function remClass(elem, name) {
+        var regExp = new RegExp("\\b" + name + "\\b", "g");
+        elem.className = elem.className.replace(regExp, "");
+      };
+      
+      function handleDragOver(evt) {
+        evt.stopPropagation();
+        evt.preventDefault();
+      };
+      
+      function handleDragEnter(evt) {
+        addClass(evt.target, "dragOver");
+        evt.target.setAttribute('data-drag-listener', true);
+        evt.target.addEventListener('dragleave', handleDragLeave, false);
+      };
+      
+      function handleDragLeave(evt) {
+        remClass(evt.target, 'dragOver');
+        evt.target.removeEventListener('dragLeave', handleDragLeave, false);
+      };
+
+      // Setup the dnd listeners.
+      var dropZone = document.querySelector('.dropTarget');
+      dropZone.addEventListener('dragover', handleDragOver, false);
+      dropZone.addEventListener('dragenter', handleDragEnter, false);
+      dropZone.addEventListener('drop', handleFileSelect, false);
+    </script>
+  </body>
+</html>
